@@ -1,0 +1,112 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>まもる経営カレンダー</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="まもる経営"><meta name="theme-color" content="#F6D58E">
+<style>
+:root{--bg:#FFF9F0;--ink:#3B3A4A;--mu:#8A8799;--bl:#CFE8F7;--mi:#D5F0E0;--pk:#FBD5DC;--ye:#FCEBBE;--ln:#EADFCF}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Hiragino Sans",sans-serif;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+#app{max-width:520px;margin:auto;padding:calc(12px + env(safe-area-inset-top)) 14px}
+h1{font-size:18px;margin:0}h2{font-size:14px;margin:18px 0 8px;color:var(--mu)}
+.c{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:12px;margin:0 0 10px}.r{background:var(--pk)}.y{background:var(--ye)}.g{background:var(--mi)}
+.ch{font-size:12px;padding:2px 10px;border-radius:10px;background:#fff;border:1px solid var(--ln);white-space:nowrap}
+button,select,input,textarea{font:inherit;color:inherit;border:1px solid var(--ln);border-radius:10px;padding:8px 10px;background:#fff;max-width:100%}
+button,.b{background:var(--bl);border:0;min-height:40px;margin:4px 6px 4px 0;text-decoration:none;display:inline-block;padding:8px 14px;border-radius:10px;color:var(--ink)}
+textarea,input[type=text],input[type=date],input[type=tel],input[type=email]{width:100%;margin:3px 0}
+input[type=checkbox]{width:20px;height:20px;padding:0}
+summary{cursor:pointer;color:#4A7FA7;font-size:14px;padding:4px 0}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border-radius:0;font-size:12px;min-height:56px;margin:0;padding:4px}nav .on{background:var(--ye)}
+.ft{text-align:center;font-size:11px;color:var(--mu);margin:24px 0 8px;letter-spacing:.06em}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}.sm{font-size:13px;color:var(--mu)}.w{color:var(--ink)}
+</style></head><body><div id="app"></div>
+<nav><button data-tab="home">ホーム</button><button data-tab="year">年間</button><button data-tab="ag">税理士</button><button data-tab="cont">連絡先</button><button data-tab="set">設定</button></nav>
+<script>
+const VER='1.0.0';
+const H={2026:'1/1,1/12,2/11,2/23,3/20,4/29,5/3,5/4,5/5,5/6,7/20,8/11,9/21,9/22,9/23,10/12,11/3,11/23',2027:'1/1,1/11,2/11,2/23,3/21,3/22,4/29,5/3,5/4,5/5,7/19,8/11,9/20,9/23,10/11,11/3,11/23',2028:'1/1,1/10,2/11,2/23,3/20,4/29,5/3,5/4,5/5,7/17,8/11,9/18,9/22,10/9,11/3,11/23'};
+const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),WD='日月火水木金土';
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const add=(d,n)=>new Date(d.getFullYear(),d.getMonth()+n,d.getDate()),dd=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const off=d=>{const w=d.getDay(),m=d.getMonth()+1,x=d.getDate();return w==0||w==6||(H[d.getFullYear()]||'').split(',').includes(m+'/'+x)||(m==12&&x==31)||(m==1&&x<=3)};
+const shift=(d,k)=>{while(off(d))d=dd(d,k=='p'?-1:1);return d};
+const T0=()=>{const x=new Date();return new Date(x.getFullYear(),x.getMonth(),x.getDate())},nd=d=>Math.round((pd(d)-T0())/864e5);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const db=new Promise((ok,ng)=>{const r=indexedDB.open('mk',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ng(r.error)});
+const kv=async(w,k,v)=>{const d=await db;return new Promise((ok,ng)=>{const s=d.transaction('kv',w?'readwrite':'readonly').objectStore('kv');const q=w?s.put(v,k):s.get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ng(q.error)})};
+const fresh=()=>({v:1,fy:9,over:{},contacts:[],checks:{},notes:{},last:Date.now(),chg:0,snooze:0});
+let S,P=null,TAB='home',AM=new Date().getMonth()+1,Y=0;const OP=new Set();
+const save=c=>{if(c)S.chg++;kv(1,'s',S)};
+const SM=()=>S.fy%12+1;
+function build(){const sm=SM(),n=new Date(),y=n.getMonth()+1>=sm?n.getFullYear():n.getFullYear()-1,s=new Date(y,sm-1,1),L=[];Y=y;
+const nm=(m,d)=>{const x=new Date(y,m-1,d);return x<s?new Date(y+1,m-1,d):x};
+const T=(id,d,title,why,o)=>L.push({id:id+'_'+y,d:ymd(d),title,why,...o});
+T('exec',dd(add(s,3),-1),'役員報酬の金額変更期限','会社の新しい1年が始まって3か月以内に、1年分のお給料をぴったり決めるルールです。<br>遅れると、増やした分が経費にならず税金が増えて損をします。<br>期の途中で増やすのは原則できないので、利益の見込みから先に考えます。',{lead:60});
+T('bonus',shift(dd(add(s,4),-1),'n'),'役員ボーナスの届出（いちばん遅い期限）','社長にボーナスを払うなら、「何月にいくら」を先に税務署へ届けるルールです。<br>期限は、株主総会で決めた日から1か月と、期首から4か月のうち早いほうです。<br>届けずに払うと経費にできず損をします。',{lead:60});
+T('tax',shift(dd(add(s,2),-1),'n'),'法人税・消費税・市民税の申告と納付','決算から2か月以内に、1年分の税金を計算して届け出て、払います。<br>遅れると延滞税など余分なお金がかかります。<br>税理士さんに早めに数字を確認しましょう。',{lead:45});
+const k=add(s,2);T('kyo',shift(new Date(k.getFullYear(),k.getMonth(),5),'n'),'共済の前納・掛金変更（希望月の5日必着）','小規模企業共済は、社長個人の節税になる貯金です（会社の経費は倒産防止共済で別の制度）。<br>前納したい月の5日までに書類が届かないと、その月からは変えられません。書類の取り寄せに時間がかかるので45日前から知らせます。<br>日付は希望月に合わせて直してください。減額の締切は窓口で確認します。',{lead:45});
+const q=add(s,1);T('sho',new Date(q.getFullYear(),q.getMonth(),20),'社会保険料控除証明書を税理士さんへ','10〜11月に届く、社長個人の年金・健康保険の証明書です。<br>会社の経費ではなく、個人の確定申告・年末調整に使います。<br>届いたら税理士さんに渡します。',{lead:30});
+T('nen',nm(12,20),'年末調整の準備（目安の日）','従業員や役員の1年分の所得税を精算する手続きです。<br>12月の給与で行うのが一般的です。<br>書類と日程を税理士さんと確認します。',{lead:30});
+T('hou',shift(nm(1,31),'n'),'給与支払報告書・法定調書・償却資産の申告','1年分の給与などを市役所や税務署へ報告する書類です。<br>富山市の償却資産（会社の機械・備品）の申告も1月末です。<br>渡す書類を税理士さんと確認します。',{lead:30});
+T('g1',shift(nm(1,20),'n'),'源泉所得税の納付（納期の特例を使う場合・1月）','社員や役員のお給料から預かった税金を、国へ納める日です。<br>特例を使っている会社は年2回（1月・7月）です。<br>使っているか分からなければ税理士さんに確認します。',{lead:20});
+T('g7',shift(nm(7,10),'n'),'源泉所得税の納付・算定基礎届（7月）','預かった税金を国へ納める日と、社会保険料を決める届出（7/1〜7/10）の時期です。<br>役員報酬を変えたときは、社会保険料への影響も確認します。',{lead:20});
+T('mid',shift(dd(add(s,8),-1),'n'),'中間申告（対象の場合）','前の年の税額が大きい会社は、半年たった時点で税金の一部を先に納めます。<br>対象かどうかは税理士さんに確認します。',{lead:45});
+T('p1',dd(add(s,6),-1),'利益の見込みを確認（期首から6か月）','半年たったところで、今期の利益がどのくらいになりそうか確認します。<br>役員報酬は期の途中で増やせないので、他の調整方法を早めに相談します。',{lead:30});
+T('p2',add(s,9),'決算前の調整を税理士さんと相談（決算3か月前）','利益が多そうなら、決算の前にできる対策があります。<br>決算賞与、倒産防止共済の掛金、前払費用、修繕、設備、不要な資産の処分などです。<br>決算が終わってからでは間に合いません。条件は税理士さんに確認します。',{lead:45});
+for(let i=0;i<12;i++){const m=add(s,i),a=m.getFullYear(),b=m.getMonth();
+T('pay'+i,shift(new Date(a,b,10),'p'),'旅費・経費の振込日','社員や役員への旅費・立替経費を精算して振り込む日です。<br>10日が土日祝・銀行休業日なら、前の営業日に早まります。',{lead:5,rec:1});
+T('kj'+i,shift(new Date(a,b,18),'n'),'共済の引落し日','共済の掛金が口座から引き落とされる日です。<br>18日が土日祝なら次の営業日です。残高を確認します。',{lead:3,rec:1})}
+return L}
+const tasks=()=>build().map(t=>{const o=S.over[t.id]||{};return{...t,d:o.d||t.d,st:o.st||'未対応',memo:o.memo||'',mod:!!o.d}}).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+const op=k=>OP.has(k)?'open':'';
+const card=t=>{const n=nd(t.d),dt=pd(t.d),done=t.st=='完了',cl=done?'g':n<=7?'r':n<=30?'y':'',k=t.id;
+const lb=done?'完了':n<0?`期限を${-n}日すぎています`:n==0?'今日':`あと${n}日`;
+return `<div class="c ${cl}"><div class="row sm w"><b>${dt.getMonth()+1}/${dt.getDate()}（${WD[dt.getDay()]}）　${lb}</b><span class="ch">${t.st}</span></div>
+<div style="font-weight:600;margin:4px 0">${t.title}${t.mod?' <span class="sm">（手入力）</span>':''}</div>
+<details data-k="w${k}" ${op('w'+k)}><summary>これ何？</summary><div class="sm w">${t.why}</div></details>
+<details data-k="e${k}" ${op('e'+k)}><summary>日付・状態・メモを変える</summary>
+<input type="date" value="${t.d}" data-id="${k}" data-f="d"><select data-id="${k}" data-f="st">${['未対応','税理士へ相談中','完了'].map(s=>`<option ${s==t.st?'selected':''}>${s}</option>`).join('')}</select>
+<textarea rows="2" placeholder="メモ" data-id="${k}" data-f="memo">${esc(t.memo)}</textarea>${S.over[k]?`<button data-act="rst" data-id="${k}">自動の内容に戻す</button>`:''}</details></div>`};
+const nag=()=>(Date.now()-S.last>7*864e5||S.chg>=15)&&Date.now()>S.snooze?`<div class="c y"><b>バックアップしておく？</b><div class="sm w">データが増えました。念のため、保存しておくと安心です。</div><button data-act="sh">保存する</button><button data-act="snz" style="background:#fff">あとで</button></div>`:'';
+function home(){const L=tasks(),n=new Date(),u=L.filter(t=>t.st!='完了'&&nd(t.d)<=(t.lead||35)),nx=L.filter(t=>t.st!='完了'&&!t.rec&&nd(t.d)>(t.lead||35)).slice(0,4);
+return `<div class="row"><h1>まもる経営カレンダー</h1></div><div class="sm">${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日（${WD[n.getDay()]}）　決算月 <select data-fy="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${S.fy==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div>`+nag()+
+`<h2>今、対応したいこと（${u.length}件）</h2>`+(u.map(card).join('')||'<div class="c g">今は急ぎの手続きはありません。</div>')+
+`<h2>このあとの予定</h2><div class="c">${nx.map(t=>`<div class="row sm w" style="padding:3px 0"><span>${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}　${t.title}</span><span>あと${nd(t.d)}日</span></div>`).join('')}</div><div class="sm">金額や期限は、税理士さんに最終確認してください。</div>`}
+function year(){const g={};tasks().forEach(t=>(g[t.d.slice(0,7)]=g[t.d.slice(0,7)]||[]).push(t));
+return `<h1>年間一覧</h1><div class="sm">${Y}年${SM()}月〜（決算月 ${S.fy}月）</div>`+Object.keys(g).sort().map(k=>`<h2>${+k.slice(5)}月</h2>`+g[k].filter(t=>!t.rec).map(card).join('')+`<details data-k="r${k}" ${op('r'+k)}><summary>この月の振込日・引落し日</summary>${g[k].filter(t=>t.rec).map(card).join('')}</details>`).join('')}
+const th=m=>{const i=(m-SM()+12)%12,r=[];if(i<3)r.push('来期の役員報酬の額を、利益の見込みから決める','役員ボーナスを出すか決め、株主総会の日を押さえる');if(i<2)r.push('社会保険料控除証明書・領収済通知書を渡す');if(i==5||i==6)r.push('利益の見込みを確認する（役員報酬は期の途中で増やせないため、他の調整を相談）');if(i>=9)r.push('決算前の調整（決算賞与・倒産防止共済・前払費用・修繕や設備・不要資産の処分）');return r};
+function agi(){const nx=AM%12+1,L=tasks().filter(t=>!t.rec&&t.st!='完了'&&[AM,nx].includes(pd(t.d).getMonth()+1));
+return [...L.map(t=>({k:'t'+t.id,s:`${t.title}（${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}）`})),...th(AM).map((s,i)=>({k:'h'+Y+'_'+AM+i,s})),...(S.notes['x'+AM]||'').split('\n').filter(Boolean).map((s,i)=>({k:'u'+Y+'_'+AM+i,s}))]}
+const agText=()=>`【${AM}月 税理士さんと話すこと】\n`+agi().map(i=>(S.checks[i.k]?'✓ ':'・')+i.s).join('\n')+`\n\n【話した結果】\n${S.notes['r'+Y+'_'+AM]||''}`;
+function ag(){return `<div class="row"><h1>税理士メモ</h1><select data-am="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${AM==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div><h2>${AM}月に話すテーマ</h2><div class="c">${agi().map(i=>`<label class="row w" style="justify-content:flex-start;align-items:flex-start;padding:4px 0"><input type="checkbox" data-ck="${i.k}" ${S.checks[i.k]?'checked':''} style="margin-top:5px"><span>${esc(i.s)}</span></label>`).join('')||'<span class="sm">今月のテーマはありません。</span>'}</div>
+<div class="sm">自分で足すテーマ（1行に1つ）</div><textarea rows="2" data-nt="x${AM}">${esc(S.notes['x'+AM])}</textarea><div class="sm">話した結果のメモ</div><textarea rows="3" data-nt="r${Y}_${AM}">${esc(S.notes['r'+Y+'_'+AM])}</textarea>
+<button data-act="cp">コピー</button><button data-act="send">送る</button>
+<h2>利益が出たとき、何を調整する？</h2><details class="c" data-k="pf" ${op('pf')}><summary>時期ごとの調整メニュー</summary><div class="sm w">
+<b>期首〜3か月</b>：役員報酬の額（期の途中で増やせません）、役員ボーナスの届出。<br><b>半年・9か月</b>：利益の見込みを見て、税理士さんと相談。<br><b>決算前</b>：決算賞与（金額を決算日までに社員へ通知など条件あり）、倒産防止共済、家賃や保険料の前払い、修繕、設備、不要資産の処分。<br><b>決算後</b>：申告と納付（2か月以内）。<br>役員報酬を変えたら、社会保険料の変更届も確認します。<br>条件や金額は改正されるため、必ず税理士さんに確認してください。</div></details>
+<h2>届いた書類の扱い</h2><div class="c sm w">社会保険料控除証明書（10〜11月）：社長個人の確定申告・年末調整用。税理士さんへ渡します。<br>確定申告のお知らせ・領収済通知書：会社の帳簿用。税理士さんへ共有します。</div>`}
+function cont(){return `<h1>連絡先ノート</h1><div class="sm">税理士事務所・税務署・中小機構などを入れておけます。手書きしたいときは、キーボードの地球儀から「手書き」を選べます。</div><br>`+S.contacts.map(c=>`<div class="c"><input type="text" placeholder="組織名（例：税理士事務所）" value="${esc(c.o)}" data-c="${c.id}" data-f="o"><input type="text" placeholder="担当者" value="${esc(c.p)}" data-c="${c.id}" data-f="p"><input type="tel" placeholder="電話番号" value="${esc(c.t)}" data-c="${c.id}" data-f="t"><input type="email" placeholder="メール" value="${esc(c.m)}" data-c="${c.id}" data-f="m"><textarea rows="2" placeholder="メモ" data-c="${c.id}" data-f="n">${esc(c.n)}</textarea>${c.t?`<a class="b" href="tel:${esc(c.t)}">電話する</a>`:''}${c.m?`<a class="b" href="mailto:${esc(c.m)}">メール</a>`:''}<button data-act="delc" data-c="${c.id}" style="background:var(--pk)">消す</button></div>`).join('')+`<button data-act="addc">連絡先を追加</button>`}
+function st(){const l=new Date(S.last);return `<h1>設定・バックアップ</h1>
+<div class="c y"><b>データは、この端末の中だけに保存されます</b><div class="sm w">ホーム画面のアイコンを削除すると、データも消えます。<br>消えにくくする設定：${P===true?'許可されています':'まだ許可されていません（ホーム画面に追加すると消えにくくなります）'}<br>無料の方法では、データが消えない保証まではできません。こまめにバックアップしてください。</div></div>
+<div class="c"><b>バックアップ</b><div class="sm">最後の保存：${l.getMonth()+1}/${l.getDate()}</div><button data-act="sh">ファイルに保存（共有）</button><button data-act="bk">JSONで書き出す</button><button data-act="rs">復元する</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
+<div class="c"><b>初期化・復元前の自動バックアップ</b><div class="sm">復元や初期化の前に、今のデータを自動で保存します。</div><button data-act="undo">直前の状態に戻す</button><button data-act="reset" style="background:var(--pk)">初期化する</button></div>
+<div class="sm">祝日データは2028年末まで入っています。決算月はホーム画面で変えられます。</div>`}
+function render(){$('#app').innerHTML=({home,year,ag,cont,set:st})[TAB]()+`<div class="ft">Presented by 波動調整師 千鈴龍穂<br>バージョン ${VER}</div>`;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab==TAB))}
+async function bk(sh){const n='mamoru-backup-'+ymd(new Date())+'.json',f=new File([JSON.stringify(S)],n,{type:'application/json'});
+if(sh&&navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){return}}else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=n;a.click()}
+S.last=Date.now();S.chg=0;save(0);render()}
+async function swap(n,msg){if(!confirm(msg))return;await kv(1,'prev',JSON.stringify(S));S={...fresh(),...n};S.chg=0;S.last=Date.now();save(0);render()}
+async function undo(){const p=await kv(0,'prev');p?swap(JSON.parse(p),'直前の状態に戻します。今のデータは自動で保存されます。よろしいですか？'):alert('戻せるデータがありません')}
+async function restore(f){if(!f)return;try{const o=JSON.parse(await f.text());if(!(o&&o.v==1&&o.over&&o.contacts))throw 0;swap(o,'今のデータを自動で保存してから、このファイルの内容に入れ替えます。よろしいですか？')}catch(e){alert('このファイルは読み込めませんでした')}}
+async function cpy(sh){const t=agText();if(sh&&navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);alert('コピーしました')}catch(e){prompt('コピーしてください',t)}}}
+const upd=t=>{const d=t.dataset;if(d.id){(S.over[d.id]=S.over[d.id]||{})[d.f]=t.value}else if(d.c){const c=S.contacts.find(x=>x.id==d.c);if(c)c[d.f]=t.value}else if(d.nt){S.notes[d.nt]=t.value}else return 0;return 1};
+document.addEventListener('input',e=>{if(upd(e.target))save(0)});
+document.addEventListener('change',e=>{const t=e.target,d=t.dataset;if(t.id=='fi'){restore(t.files[0]);return}if(d.ck){S.checks[d.ck]=t.checked;save(1);return}if(d.fy){S.fy=+t.value;save(1);render();return}if(d.am){AM=+t.value;render();return}if(upd(t)){save(1);render()}});
+document.addEventListener('toggle',e=>{const k=e.target.dataset&&e.target.dataset.k;if(k)e.target.open?OP.add(k):OP.delete(k)},true);
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act],[data-tab]');if(!b)return;const d=b.dataset,a=d.act;
+if(d.tab){TAB=d.tab;render();scrollTo(0,0);return}
+if(a=='rst'){delete S.over[d.id];save(1);render()}else if(a=='addc'){S.contacts.push({id:Date.now()});save(1);render()}
+else if(a=='delc'){if(confirm('この連絡先を消しますか？')){S.contacts=S.contacts.filter(x=>x.id!=d.c);save(1);render()}}
+else if(a=='bk')bk(0);else if(a=='sh')bk(1);else if(a=='snz'){S.snooze=Date.now()+3*864e5;save(0);render()}
+else if(a=='cp')cpy(0);else if(a=='send')cpy(1);else if(a=='rs')$('#fi').click();
+else if(a=='reset')swap(fresh(),'全部のデータを消して最初の状態にします。今のデータは自動で保存してから実行します。よろしいですか？');else if(a=='undo')undo()});
+(async()=>{try{S=await kv(0,'s')}catch(e){}S=S?{...fresh(),...S}:fresh();try{P=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null}catch(e){}render();
+if('serviceWorker' in navigator){const had=navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()})}})();
+</script></body></html>
