@@ -20,7 +20,7 @@ nav button{flex:1;background:none;border-radius:0;font-size:12px;min-height:56px
 </style></head><body><div id="app"></div>
 <nav><button data-tab="home">ホーム</button><button data-tab="year">年間</button><button data-tab="ag">税理士</button><button data-tab="cont">連絡先</button><button data-tab="set">設定</button></nav>
 <script>
-const VER='1.2.0';
+const VER='1.3.0';
 const PF=[['tax','消費税','課税|免税|不明'],['gen','源泉所得税の納付','特例を使う|毎月納付|不明'],['mid','中間申告','対象|対象外|不明'],['sha','社会保険','あり|なし|不明'],['jyu','住民税の特別徴収','あり|なし|不明'],['exe','役員報酬','あり|なし']];
 const H={2026:'1/1,1/12,2/11,2/23,3/20,4/29,5/3,5/4,5/5,5/6,7/20,8/11,9/21,9/22,9/23,10/12,11/3,11/23',2027:'1/1,1/11,2/11,2/23,3/21,3/22,4/29,5/3,5/4,5/5,7/19,8/11,9/20,9/23,10/11,11/3,11/23',2028:'1/1,1/10,2/11,2/23,3/20,4/29,5/3,5/4,5/5,7/17,8/11,9/18,9/22,10/9,11/3,11/23'};
 const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),WD='日月火水木金土';
@@ -34,10 +34,10 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const db=new Promise((ok,ng)=>{const r=indexedDB.open('mk',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ng(r.error)});
 const kv=async(w,k,v)=>{const d=await db;return new Promise((ok,ng)=>{const s=d.transaction('kv',w?'readwrite':'readonly').objectStore('kv');const q=w?s.put(v,k):s.get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ng(q.error)})};
 const fresh=()=>({v:1,fy:9,prof:{},over:{},contacts:[],checks:{},notes:{},last:Date.now(),chg:0,snooze:0});
-let S,P=null,TAB='home',AM=new Date().getMonth()+1,Y=0;const OP=new Set();
+let S,P=null,VY=0,HY=0,LK=false,HT=0,TAB='home',AM=new Date().getMonth()+1,Y=0;const OP=new Set();
 const save=c=>{if(c)S.chg++;kv(1,'s',S)};
 const SM=()=>S.fy%12+1;
-function build(){const pf=S.prof||{},sm=SM(),n=new Date(),y=n.getMonth()+1>=sm?n.getFullYear():n.getFullYear()-1,s=new Date(y,sm-1,1),L=[];Y=y;
+function build(){const pf=S.prof||{},sm=SM(),n=new Date(),y=VY||(n.getMonth()+1>=sm?n.getFullYear():n.getFullYear()-1),s=new Date(y,sm-1,1),L=[];Y=y;
 const nm=(m,d)=>{const x=new Date(y,m-1,d);return x<s?new Date(y+1,m-1,d):x};
 const T=(id,d,title,why,o)=>L.push({id:id+'_'+y,d:ymd(d),title,why,...o});
 if(pf.exe!='なし')T('exec',dd(add(s,3),-1),'役員報酬の金額変更期限','会社の新しい1年が始まって3か月以内に、1年分のお給料をぴったり決めるルールです。<br>遅れると、増やした分が経費にならず税金が増えて損をします。<br>期の途中で増やすのは原則できないので、利益の見込みから先に考えます。',{lead:60});
@@ -78,8 +78,8 @@ function home(){const L=tasks(),n=new Date(),u=L.filter(t=>isOpen(t)&&nd(t.d)<=(
 return `<div class="row"><h1>まもる経営カレンダー</h1></div><div class="sm">${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日（${WD[n.getDay()]}）　決算月 <select data-fy="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${S.fy==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div>`+nag()+(Object.keys(S.prof||{}).length?'':`<div class="c y"><b>会社の条件を設定しましょう</b><div class="sm w">課税・免税や源泉の特例などを選ぶと、不要な手続きが消えます。</div><button data-tab="set">設定へ</button></div>`)+
 `<h2>今、対応したいこと（${u.length}件）</h2>`+(u.map(card).join('')||'<div class="c g">今は急ぎの手続きはありません。</div>')+
 `<h2>このあとの予定</h2><div class="c">${nx.map(t=>`<div class="row sm w" style="padding:3px 0"><span>${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}　${t.title}</span><span>あと${nd(t.d)}日</span></div>`).join('')}</div><div class="sm">金額や期限は、税理士さんに最終確認してください。</div>`}
-function year(){const g={};tasks().forEach(t=>(g[t.d.slice(0,7)]=g[t.d.slice(0,7)]||[]).push(t));
-return `<h1>年間一覧</h1><div class="sm">${Y}年${SM()}月〜（決算月 ${S.fy}月）</div>`+Object.keys(g).sort().map(k=>`<h2>${+k.slice(5)}月</h2>`+g[k].filter(t=>!t.rec).map(card).join('')+`<details data-k="r${k}" ${op('r'+k)}><summary>この月の振込日・引落し日</summary>${g[k].filter(t=>t.rec).map(card).join('')}</details>`).join('')}
+function year(){VY=0;build();const cur=Y,ys=[...new Set([cur+1,cur,...Object.keys(S.over).map(k=>+k.split('_').pop()).filter(x=>x>2000)])].sort().reverse();VY=HY;const g={};tasks().forEach(t=>(g[t.d.slice(0,7)]=g[t.d.slice(0,7)]||[]).push(t));VY=0;
+return `<div class="row"><h1>年間一覧</h1><select data-hy="1">${ys.map(y=>`<option value="${y}" ${(HY||cur)==y?'selected':''}>${y}年度${y==cur?'（今期）':y>cur?'（来期）':'（過去）'}</option>`).join('')}</select></div><button data-act="carry" style="font-size:13px">前の年度の担当者を引き継ぐ</button><div class="sm">${Y}年${SM()}月〜（決算月 ${S.fy}月）</div>`+Object.keys(g).sort().map(k=>`<h2>${+k.slice(5)}月</h2>`+g[k].filter(t=>!t.rec).map(card).join('')+`<details data-k="r${k}" ${op('r'+k)}><summary>この月の振込日・引落し日</summary>${g[k].filter(t=>t.rec).map(card).join('')}</details>`).join('')}
 const th=m=>{const i=(m-SM()+12)%12,r=[];if(i<3)r.push('来期の役員報酬の額を、利益の見込みから決める','役員ボーナスを出すか決め、株主総会の日を押さえる');if(i<2)r.push('社会保険料控除証明書・領収済通知書を渡す');if(i==5||i==6)r.push('利益の見込みを確認する（役員報酬は期の途中で増やせないため、他の調整を相談）');if(i>=9)r.push('決算前の調整（決算賞与・倒産防止共済・前払費用・修繕や設備・不要資産の処分）');return r};
 function agi(){const nx=AM%12+1,L=tasks().filter(t=>!t.rec&&isOpen(t)&&[AM,nx].includes(pd(t.d).getMonth()+1));
 return [...L.map(t=>({k:'t'+t.id,s:`${t.title}（${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}）`})),...th(AM).map((s,i)=>({k:'h'+Y+'_'+AM+i,s})),...(S.notes['x'+AM]||'').split('\n').filter(Boolean).map((s,i)=>({k:'u'+Y+'_'+AM+i,s}))]}
@@ -93,28 +93,39 @@ function ag(){return `<div class="row"><h1>税理士メモ</h1><select data-am="
 function cont(){return `<h1>連絡先ノート</h1><div class="sm">税理士事務所・税務署・中小機構などを入れておけます。手書きしたいときは、キーボードの地球儀から「手書き」を選べます。</div><br>`+S.contacts.map(c=>`<div class="c"><input type="text" placeholder="組織名（例：税理士事務所）" value="${esc(c.o)}" data-c="${c.id}" data-f="o"><input type="text" placeholder="担当者" value="${esc(c.p)}" data-c="${c.id}" data-f="p"><input type="tel" placeholder="電話番号" value="${esc(c.t)}" data-c="${c.id}" data-f="t"><input type="email" placeholder="メール" value="${esc(c.m)}" data-c="${c.id}" data-f="m"><textarea rows="2" placeholder="メモ" data-c="${c.id}" data-f="n">${esc(c.n)}</textarea>${c.t?`<a class="b" href="tel:${esc(c.t)}">電話する</a>`:''}${c.m?`<a class="b" href="mailto:${esc(c.m)}">メール</a>`:''}<button data-act="delc" data-c="${c.id}" style="background:var(--pk)">消す</button></div>`).join('')+`<button data-act="addc">連絡先を追加</button>`}
 function st(){const l=new Date(S.last);return `<h1>設定・バックアップ</h1><div class="c"><b>会社の条件</b><div class="sm">選ぶと、年間の手続きの表示が変わります。「不明」のときは、念のため全部表示します。税理士さんに聞いて選んでください。</div>${PF.map(([k,l,o])=>`<div class="row" style="padding:4px 0"><span>${l}</span><select data-pf="${k}">${o.split('|').map(v=>`<option ${((S.prof||{})[k]||(k=='exe'?'あり':'不明'))==v?'selected':''}>${v}</option>`).join('')}</select></div>`).join('')}</div>
 <div class="c y"><b>データは、この端末の中だけに保存されます</b><div class="sm w">ホーム画面のアイコンを削除すると、データも消えます。<br>消えにくくする設定：${P===true?'許可されています':'まだ許可されていません（ホーム画面に追加すると消えにくくなります）'}<br>無料の方法では、データが消えない保証まではできません。こまめにバックアップしてください。</div></div>
-<div class="c"><b>バックアップ</b><div class="sm">最後の保存：${l.getMonth()+1}/${l.getDate()}</div><button data-act="sh">ファイルに保存（共有）</button><button data-act="bk">JSONで書き出す</button><button data-act="rs">復元する</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
-<div class="c"><b>初期化・復元前の自動バックアップ</b><div class="sm">復元や初期化の前に、今のデータを自動で保存します。</div><button data-act="undo">直前の状態に戻す</button><button data-act="reset" style="background:var(--pk)">初期化する</button></div>
+<div class="c"><b>バックアップ</b><div class="sm">最後の保存：${l.getMonth()+1}/${l.getDate()}</div><button data-act="bke">暗号化して保存（おすすめ）</button><button data-act="sh">ファイルに保存（共有）</button><button data-act="bk">JSONで書き出す</button><button data-act="rs">復元する</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
+<div class="c"><b>画面ロック（かんたんな鍵）</b><div class="sm">${S.lock?'設定中':'未設定'}。ひらくとき、暗証番号が必要になります。これは目隠しで、データそのものを暗号化するものではありません。本当の守りは、iPhone自体のパスコードです。</div><button data-act="setlock">${S.lock?'番号を変える':'設定する'}</button>${S.lock?'<button data-act="nolock" style="background:var(--pk)">解除する</button>':''}</div><div class="c"><b>初期化・復元前の自動バックアップ</b><div class="sm">復元や初期化の前に、今のデータを自動で保存します。</div><button data-act="undo">直前の状態に戻す</button><button data-act="reset" style="background:var(--pk)">初期化する</button></div>
 <div class="sm">祝日データは2028年末まで入っています。決算月はホーム画面で変えられます。</div>`}
-function render(){$('#app').innerHTML=({home,year,ag,cont,set:st})[TAB]()+`<div class="ft">Presented by 波動調整師 千鈴龍穂<br>バージョン ${VER}</div>`;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab==TAB))}
-async function bk(sh){const n='mamoru-backup-'+ymd(new Date())+'.json',f=new File([JSON.stringify(S)],n,{type:'application/json'});
+function render(){$('nav').style.display=LK?'none':'flex';if(LK){$('#app').innerHTML=LOCK;return}$('#app').innerHTML=({home,year,ag,cont,set:st})[TAB]()+`<div class="ft">Presented by 波動調整師 千鈴龍穂<br>バージョン ${VER}</div>`;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab==TAB))}
+async function bk(sh,ec){let txt=JSON.stringify(S);if(ec){const p=prompt('バックアップ用のパスワードを決めてください（忘れると開けません）');if(!p)return;txt=await enc(txt,p)}const n='mamoru-backup-'+ymd(new Date())+(ec?'-enc':'')+'.json',f=new File([txt],n,{type:'application/json'});
 if(sh&&navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){return}}else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=n;a.click()}
 S.last=Date.now();S.chg=0;save(0);render()}
+const LOCK=`<div class="c" style="margin-top:18vh;text-align:center"><b>まもる経営カレンダー</b><div class="sm">暗証番号を入れてください</div><input id="pin" type="password" inputmode="numeric" autocomplete="off" style="text-align:center;max-width:200px"><br><button data-act="unl">ひらく</button><div id="lm" class="sm"></div><button data-act="forgot" style="background:#fff;font-size:12px">暗証番号を忘れた</button></div>`;
+const sha=async x=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('mk'+x)))].map(v=>v.toString(16).padStart(2,'0')).join('');
+const b64=u=>{let t='';u.forEach(x=>t+=String.fromCharCode(x));return btoa(t)},ub=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function key(p,salt){const m=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function enc(txt,p){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),c=await crypto.subtle.encrypt({name:'AES-GCM',iv},await key(p,salt),new TextEncoder().encode(txt));return JSON.stringify({enc:1,salt:b64(salt),iv:b64(iv),data:b64(new Uint8Array(c))})}
+async function dec(o,p){return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.iv)},await key(p,ub(o.salt)),ub(o.data)))}
+async function unl(){if(await sha($('#pin').value)==S.lock){LK=false;HT=Date.now();render()}else $('#lm').textContent='番号が違います'}
+async function setlock(){const a=prompt('暗証番号を入れてください（数字4けた以上）');if(!a)return;if(!/^\d{4,}$/.test(a)){alert('数字4けた以上で入れてください');return}if(prompt('もう一度入れてください')!==a){alert('番号が合いません');return}S.lock=await sha(a);save(1);alert('設定しました。忘れないように、メモしておいてください');render()}
+function nolock(){if(confirm('画面ロックを解除しますか？')){S.lock='';save(1);render()}}
+function forgot(){if(confirm('暗証番号を忘れたときは、アプリの中のデータを消して最初からになります。バックアップがあれば、あとで復元できます。消しますか？')){S=fresh();LK=false;save(0);render()}}
+function carry(){VY=0;build();const y=HY||Y;let n=0;Object.keys(S.over).forEach(k=>{if(k.endsWith('_'+(y-1))){const o=S.over[k],nk=k.slice(0,-5)+'_'+y;if(o.who&&!(S.over[nk]&&S.over[nk].who)){(S.over[nk]=S.over[nk]||{}).who=o.who;n++}}});save(1);alert(n+'件の担当者を引き継ぎました');render()}
 async function swap(n,msg){if(!confirm(msg))return;await kv(1,'prev',JSON.stringify(S));S={...fresh(),...n};S.chg=0;S.last=Date.now();save(0);render()}
 async function undo(){const p=await kv(0,'prev');p?swap(JSON.parse(p),'直前の状態に戻します。今のデータは自動で保存されます。よろしいですか？'):alert('戻せるデータがありません')}
-async function restore(f){if(!f)return;try{const o=JSON.parse(await f.text());if(!(o&&o.v==1&&o.over&&o.contacts))throw 0;swap(o,'今のデータを自動で保存してから、このファイルの内容に入れ替えます。よろしいですか？')}catch(e){alert('このファイルは読み込めませんでした')}}
+async function restore(f){if(!f)return;try{let o=JSON.parse(await f.text());if(o&&o.enc){const p=prompt('バックアップのパスワードを入れてください');if(!p)return;o=JSON.parse(await dec(o,p))}if(!(o&&o.v==1&&o.over&&o.contacts))throw 0;swap(o,'今のデータを自動で保存してから、このファイルの内容に入れ替えます。よろしいですか？')}catch(e){alert('このファイルは読み込めませんでした（パスワードが違う可能性があります）')}}
 async function cpy(sh){const t=agText();if(sh&&navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);alert('コピーしました')}catch(e){prompt('コピーしてください',t)}}}
 const upd=t=>{const d=t.dataset;if(d.id){(S.over[d.id]=S.over[d.id]||{})[d.f]=t.type=='checkbox'?t.checked:t.value}else if(d.c){const c=S.contacts.find(x=>x.id==d.c);if(c)c[d.f]=t.value}else if(d.nt){S.notes[d.nt]=t.value}else return 0;return 1};
 document.addEventListener('input',e=>{if(upd(e.target))save(0)});
-document.addEventListener('change',e=>{const t=e.target,d=t.dataset;if(t.id=='fi'){restore(t.files[0]);return}if(d.ck){S.checks[d.ck]=t.checked;save(1);if(d.ck[0]=='c')render();return}if(d.pf){S.prof=S.prof||{};S.prof[d.pf]=t.value;save(1);render();return}if(d.fy){S.fy=+t.value;save(1);render();return}if(d.am){AM=+t.value;render();return}if(upd(t)){save(1);render()}});
-document.addEventListener('toggle',e=>{const k=e.target.dataset&&e.target.dataset.k;if(k)e.target.open?OP.add(k):OP.delete(k)},true);
+document.addEventListener('change',e=>{const t=e.target,d=t.dataset;if(t.id=='fi'){restore(t.files[0]);return}if(d.ck){S.checks[d.ck]=t.checked;save(1);if(d.ck[0]=='c')render();return}if(d.hy){HY=+t.value;render();return}if(d.pf){S.prof=S.prof||{};S.prof[d.pf]=t.value;save(1);render();return}if(d.fy){S.fy=+t.value;save(1);render();return}if(d.am){AM=+t.value;render();return}if(upd(t)){save(1);render()}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)HT=Date.now();else if(S&&S.lock&&!LK&&Date.now()-HT>3e5){LK=true;render()}});document.addEventListener('keydown',e=>{if(e.key=='Enter'&&LK)unl()});document.addEventListener('toggle',e=>{const k=e.target.dataset&&e.target.dataset.k;if(k)e.target.open?OP.add(k):OP.delete(k)},true);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act],[data-tab]');if(!b)return;const d=b.dataset,a=d.act;
 if(d.tab){TAB=d.tab;render();scrollTo(0,0);return}
 if(a=='rst'){delete S.over[d.id];save(1);render()}else if(a=='addc'){S.contacts.push({id:Date.now()});save(1);render()}
 else if(a=='delc'){if(confirm('この連絡先を消しますか？')){S.contacts=S.contacts.filter(x=>x.id!=d.c);save(1);render()}}
-else if(a=='bk')bk(0);else if(a=='sh')bk(1);else if(a=='snz'){S.snooze=Date.now()+3*864e5;save(0);render()}
+else if(a=='bk')bk(0);else if(a=='sh')bk(1);else if(a=='bke')bk(1,1);else if(a=='unl')unl();else if(a=='setlock')setlock();else if(a=='nolock')nolock();else if(a=='forgot')forgot();else if(a=='carry')carry();else if(a=='snz'){S.snooze=Date.now()+3*864e5;save(0);render()}
 else if(a=='cp')cpy(0);else if(a=='send')cpy(1);else if(a=='rs')$('#fi').click();
 else if(a=='reset')swap(fresh(),'全部のデータを消して最初の状態にします。今のデータは自動で保存してから実行します。よろしいですか？');else if(a=='undo')undo()});
-(async()=>{try{S=await kv(0,'s')}catch(e){}S=S?{...fresh(),...S}:fresh();try{P=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null}catch(e){}render();
+(async()=>{try{S=await kv(0,'s')}catch(e){}S=S?{...fresh(),...S}:fresh();LK=!!S.lock;try{P=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null}catch(e){}render();
 if('serviceWorker' in navigator){const had=navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()})}})();
 </script></body></html>
