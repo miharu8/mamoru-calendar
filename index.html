@@ -20,7 +20,8 @@ nav button{flex:1;background:none;border-radius:0;font-size:12px;min-height:56px
 </style></head><body><div id="app"></div>
 <nav><button data-tab="home">ホーム</button><button data-tab="year">年間</button><button data-tab="ag">税理士</button><button data-tab="cont">連絡先</button><button data-tab="set">設定</button></nav>
 <script>
-const VER='1.1.0';
+const VER='1.2.0';
+const PF=[['tax','消費税','課税|免税|不明'],['gen','源泉所得税の納付','特例を使う|毎月納付|不明'],['mid','中間申告','対象|対象外|不明'],['sha','社会保険','あり|なし|不明'],['jyu','住民税の特別徴収','あり|なし|不明'],['exe','役員報酬','あり|なし']];
 const H={2026:'1/1,1/12,2/11,2/23,3/20,4/29,5/3,5/4,5/5,5/6,7/20,8/11,9/21,9/22,9/23,10/12,11/3,11/23',2027:'1/1,1/11,2/11,2/23,3/21,3/22,4/29,5/3,5/4,5/5,7/19,8/11,9/20,9/23,10/11,11/3,11/23',2028:'1/1,1/10,2/11,2/23,3/20,4/29,5/3,5/4,5/5,7/17,8/11,9/18,9/22,10/9,11/3,11/23'};
 const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),WD='日月火水木金土';
 const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -32,28 +33,32 @@ const T0=()=>{const x=new Date();return new Date(x.getFullYear(),x.getMonth(),x.
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const db=new Promise((ok,ng)=>{const r=indexedDB.open('mk',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ng(r.error)});
 const kv=async(w,k,v)=>{const d=await db;return new Promise((ok,ng)=>{const s=d.transaction('kv',w?'readwrite':'readonly').objectStore('kv');const q=w?s.put(v,k):s.get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ng(q.error)})};
-const fresh=()=>({v:1,fy:9,over:{},contacts:[],checks:{},notes:{},last:Date.now(),chg:0,snooze:0});
+const fresh=()=>({v:1,fy:9,prof:{},over:{},contacts:[],checks:{},notes:{},last:Date.now(),chg:0,snooze:0});
 let S,P=null,TAB='home',AM=new Date().getMonth()+1,Y=0;const OP=new Set();
 const save=c=>{if(c)S.chg++;kv(1,'s',S)};
 const SM=()=>S.fy%12+1;
-function build(){const sm=SM(),n=new Date(),y=n.getMonth()+1>=sm?n.getFullYear():n.getFullYear()-1,s=new Date(y,sm-1,1),L=[];Y=y;
+function build(){const pf=S.prof||{},sm=SM(),n=new Date(),y=n.getMonth()+1>=sm?n.getFullYear():n.getFullYear()-1,s=new Date(y,sm-1,1),L=[];Y=y;
 const nm=(m,d)=>{const x=new Date(y,m-1,d);return x<s?new Date(y+1,m-1,d):x};
 const T=(id,d,title,why,o)=>L.push({id:id+'_'+y,d:ymd(d),title,why,...o});
-T('exec',dd(add(s,3),-1),'役員報酬の金額変更期限','会社の新しい1年が始まって3か月以内に、1年分のお給料をぴったり決めるルールです。<br>遅れると、増やした分が経費にならず税金が増えて損をします。<br>期の途中で増やすのは原則できないので、利益の見込みから先に考えます。',{lead:60});
-T('bonus',shift(dd(add(s,4),-1),'n'),'役員ボーナスの届出（いちばん遅い期限）','社長にボーナスを払うなら、「何月にいくら」を先に税務署へ届けるルールです。<br>期限は、株主総会で決めた日から1か月と、期首から4か月のうち早いほうです。<br>届けずに払うと経費にできず損をします。',{lead:60});
-T('tax',shift(dd(add(s,2),-1),'n'),'法人税・消費税・市民税の申告と納付','決算から2か月以内に、1年分の税金を計算して届け出て、払います。<br>遅れると延滞税など余分なお金がかかります。<br>税理士さんに早めに数字を確認しましょう。',{lead:45});
+if(pf.exe!='なし')T('exec',dd(add(s,3),-1),'役員報酬の金額変更期限','会社の新しい1年が始まって3か月以内に、1年分のお給料をぴったり決めるルールです。<br>遅れると、増やした分が経費にならず税金が増えて損をします。<br>期の途中で増やすのは原則できないので、利益の見込みから先に考えます。',{lead:60});
+if(pf.exe!='なし')T('bonus',shift(dd(add(s,4),-1),'n'),'役員ボーナスの届出（いちばん遅い期限）','社長にボーナスを払うなら、「何月にいくら」を先に税務署へ届けるルールです。<br>期限は、株主総会で決めた日から1か月と、期首から4か月のうち早いほうです。<br>届けずに払うと経費にできず損をします。',{lead:60});
+T('tax',shift(dd(add(s,2),-1),'n'),'法人税・'+(pf.tax=='免税'?'':'消費税・')+'市民税の申告と納付','決算から2か月以内に、1年分の税金を計算して届け出て、払います。<br>遅れると延滞税など余分なお金がかかります。<br>税理士さんに早めに数字を確認しましょう。',{lead:45});
 const k=add(s,2);T('kyo',shift(new Date(k.getFullYear(),k.getMonth(),5),'n'),'共済の前納・掛金変更（希望月の5日必着）','小規模企業共済は、社長個人の節税になる貯金です（会社の経費は倒産防止共済で別の制度）。<br>前納したい月の5日までに書類が届かないと、その月からは変えられません。書類の取り寄せに時間がかかるので45日前から知らせます。<br>日付は希望月に合わせて直してください。減額の締切は窓口で確認します。',{lead:45});
 const q=add(s,1);T('sho',new Date(q.getFullYear(),q.getMonth(),20),'社会保険料控除証明書を税理士さんへ','10〜11月に届く、社長個人の年金・健康保険の証明書です。<br>会社の経費ではなく、個人の確定申告・年末調整に使います。<br>届いたら税理士さんに渡します。',{lead:30});
 T('nen',nm(12,20),'年末調整の準備（目安の日）','従業員や役員の1年分の所得税を精算する手続きです。<br>12月の給与で行うのが一般的です。<br>書類と日程を税理士さんと確認します。',{lead:30});
 T('hou',shift(nm(1,31),'n'),'給与支払報告書・法定調書・償却資産の申告','1年分の給与などを市役所や税務署へ報告する書類です。<br>富山市の償却資産（会社の機械・備品）の申告も1月末です。<br>渡す書類を税理士さんと確認します。',{lead:30});
-T('g1',shift(nm(1,20),'n'),'源泉所得税の納付（納期の特例を使う場合・1月）','社員や役員のお給料から預かった税金を、国へ納める日です。<br>特例を使っている会社は年2回（1月・7月）です。<br>使っているか分からなければ税理士さんに確認します。',{lead:20});
-T('g7',shift(nm(7,10),'n'),'源泉所得税の納付・算定基礎届（7月）','預かった税金を国へ納める日と、社会保険料を決める届出（7/1〜7/10）の時期です。<br>役員報酬を変えたときは、社会保険料への影響も確認します。',{lead:20});
-T('mid',shift(dd(add(s,8),-1),'n'),'中間申告（対象の場合）','前の年の税額が大きい会社は、半年たった時点で税金の一部を先に納めます。<br>対象かどうかは税理士さんに確認します。',{lead:45});
+if(pf.gen!='毎月納付')T('g1',shift(nm(1,20),'n'),'源泉所得税の納付（納期の特例を使う場合・1月）','社員や役員のお給料から預かった税金を、国へ納める日です。<br>特例を使っている会社は年2回（1月・7月）です。<br>使っているか分からなければ税理士さんに確認します。',{lead:20});
+if(!(pf.gen=='毎月納付'&&pf.sha=='なし'))T('g7',shift(nm(7,10),'n'),(pf.gen=='毎月納付'?'':'源泉所得税の納付')+(pf.gen!='毎月納付'&&pf.sha!='なし'?'・':'')+(pf.sha=='なし'?'':'算定基礎届')+'（7月）','預かった税金を国へ納める日と、社会保険料を決める届出（7/1〜7/10）の時期です。<br>役員報酬を変えたときは、社会保険料への影響も確認します。',{lead:20});
+if(pf.mid!='対象外')T('mid',shift(dd(add(s,8),-1),'n'),'中間申告（対象の場合）','前の年の税額が大きい会社は、半年たった時点で税金の一部を先に納めます。<br>対象かどうかは税理士さんに確認します。',{lead:45});
 T('p1',dd(add(s,6),-1),'利益の見込みを確認（期首から6か月）','半年たったところで、今期の利益がどのくらいになりそうか確認します。<br>役員報酬は期の途中で増やせないので、他の調整方法を早めに相談します。',{lead:30});
 T('p2',add(s,9),'決算前の調整を税理士さんと相談（決算3か月前）','利益が多そうなら、決算の前にできる対策があります。<br>決算賞与、倒産防止共済の掛金、前払費用、修繕、設備、不要な資産の処分などです。<br>決算が終わってからでは間に合いません。条件は税理士さんに確認します。',{lead:45});
 for(let i=0;i<12;i++){const m=add(s,i),a=m.getFullYear(),b=m.getMonth();
 T('pay'+i,shift(new Date(a,b,10),'p'),'旅費・経費の振込日','社員や役員への旅費・立替経費を精算して振り込む日です。<br>10日が土日祝・銀行休業日なら、前の営業日に早まります。',{lead:5,rec:1});
-T('kj'+i,shift(new Date(a,b,18),'n'),'共済の引落し日','共済の掛金が口座から引き落とされる日です。<br>18日が土日祝なら次の営業日です。残高を確認します。',{lead:3,rec:1})}
+T('kj'+i,shift(new Date(a,b,18),'n'),'共済の引落し日','共済の掛金が口座から引き落とされる日です。<br>18日が土日祝なら次の営業日です。残高を確認します。',{lead:3,rec:1});
+if(pf.sha!='なし')T('sh'+i,shift(new Date(a,b+2,0),'n'),'社会保険料の納付（'+(b+1)+'月分）','健康保険・厚生年金の保険料を納める日です。<br>当月分は翌月末までに納めます。口座振替の場合は、残高を確認します。',{lead:7,rec:1});
+if(pf.gen=='毎月納付')T('gs'+i,shift(new Date(a,b,10),'n'),'源泉所得税の納付（前月分）','社員や役員のお給料から預かった税金を、国へ納める日です。<br>毎月払う場合は、翌月10日までです。',{lead:7,rec:1});
+if(pf.jyu!='なし')T('jy'+i,shift(new Date(a,b,10),'n'),'住民税（特別徴収）の納付','お給料から預かった住民税を、市へ納める日です。<br>毎月10日までが基本です。特例の場合は年2回なので、税理士さんや市に確認します。',{lead:7,rec:1});
+T('bk'+i,new Date(a,b+1,0),'売上・経費の記帳、領収書の整理、預金残高の確認','毎月末に、お金の出入りを帳簿に書き、領収書をまとめます。<br>決算のときに慌てず、税理士さんへ渡す資料もそろいます。',{lead:3,rec:1})}
 return L}
 const SS=['未着手','準備中','税理士確認待ち','提出・納付待ち','完了','対象外'],MG={'未対応':'未着手','税理士へ相談中':'税理士確認待ち'},WHO=['','妻（社長）','夫（役員）','税理士','社労士','その他'];
 const isOpen=t=>t.st!='完了'&&t.st!='対象外';
@@ -70,7 +75,7 @@ return `<div class="c ${cl}"><div class="row sm w"><b>${dt.getMonth()+1}/${dt.ge
 <select data-id="${k}" data-f="who">${WHO.map(s=>`<option ${s==t.who?'selected':''}>${s}</option>`).join('')}</select> <span class="sm">担当者</span>${t.rec?'':`<div class="sm">提出完了日</div><input type="date" value="${t.sd}" data-id="${k}" data-f="sd"><div class="sm">納付完了日</div><input type="date" value="${t.pd}" data-id="${k}" data-f="pd"><label class="row w" style="justify-content:flex-start"><input type="checkbox" ${t.ok?'checked':''} data-id="${k}" data-f="ok"><span>税理士さんに確認した</span></label>`}<textarea rows="2" placeholder="メモ" data-id="${k}" data-f="memo">${esc(t.memo)}</textarea>${S.over[k]?`<button data-act="rst" data-id="${k}">自動の内容に戻す</button>`:''}</details></div>`};
 const nag=()=>(Date.now()-S.last>7*864e5||S.chg>=15)&&Date.now()>S.snooze?`<div class="c y"><b>バックアップしておく？</b><div class="sm w">データが増えました。念のため、保存しておくと安心です。</div><button data-act="sh">保存する</button><button data-act="snz" style="background:#fff">あとで</button></div>`:'';
 function home(){const L=tasks(),n=new Date(),u=L.filter(t=>isOpen(t)&&nd(t.d)<=(t.lead||35)),nx=L.filter(t=>isOpen(t)&&!t.rec&&nd(t.d)>(t.lead||35)).slice(0,4);
-return `<div class="row"><h1>まもる経営カレンダー</h1></div><div class="sm">${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日（${WD[n.getDay()]}）　決算月 <select data-fy="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${S.fy==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div>`+nag()+
+return `<div class="row"><h1>まもる経営カレンダー</h1></div><div class="sm">${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日（${WD[n.getDay()]}）　決算月 <select data-fy="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${S.fy==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div>`+nag()+(Object.keys(S.prof||{}).length?'':`<div class="c y"><b>会社の条件を設定しましょう</b><div class="sm w">課税・免税や源泉の特例などを選ぶと、不要な手続きが消えます。</div><button data-tab="set">設定へ</button></div>`)+
 `<h2>今、対応したいこと（${u.length}件）</h2>`+(u.map(card).join('')||'<div class="c g">今は急ぎの手続きはありません。</div>')+
 `<h2>このあとの予定</h2><div class="c">${nx.map(t=>`<div class="row sm w" style="padding:3px 0"><span>${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}　${t.title}</span><span>あと${nd(t.d)}日</span></div>`).join('')}</div><div class="sm">金額や期限は、税理士さんに最終確認してください。</div>`}
 function year(){const g={};tasks().forEach(t=>(g[t.d.slice(0,7)]=g[t.d.slice(0,7)]||[]).push(t));
@@ -86,7 +91,7 @@ function ag(){return `<div class="row"><h1>税理士メモ</h1><select data-am="
 <b>期首〜3か月</b>：役員報酬の額（期の途中で増やせません）、役員ボーナスの届出。<br><b>半年・9か月</b>：利益の見込みを見て、税理士さんと相談。<br><b>決算前</b>：決算賞与（金額を決算日までに社員へ通知など条件あり）、倒産防止共済、家賃や保険料の前払い、修繕、設備、不要資産の処分。<br><b>決算後</b>：申告と納付（2か月以内）。<br>役員報酬を変えたら、社会保険料の変更届も確認します。<br>条件や金額は改正されるため、必ず税理士さんに確認してください。</div></details>
 <h2>届いた書類の扱い</h2><div class="c sm w">社会保険料控除証明書（10〜11月）：社長個人の確定申告・年末調整用。税理士さんへ渡します。<br>確定申告のお知らせ・領収済通知書：会社の帳簿用。税理士さんへ共有します。</div>`}
 function cont(){return `<h1>連絡先ノート</h1><div class="sm">税理士事務所・税務署・中小機構などを入れておけます。手書きしたいときは、キーボードの地球儀から「手書き」を選べます。</div><br>`+S.contacts.map(c=>`<div class="c"><input type="text" placeholder="組織名（例：税理士事務所）" value="${esc(c.o)}" data-c="${c.id}" data-f="o"><input type="text" placeholder="担当者" value="${esc(c.p)}" data-c="${c.id}" data-f="p"><input type="tel" placeholder="電話番号" value="${esc(c.t)}" data-c="${c.id}" data-f="t"><input type="email" placeholder="メール" value="${esc(c.m)}" data-c="${c.id}" data-f="m"><textarea rows="2" placeholder="メモ" data-c="${c.id}" data-f="n">${esc(c.n)}</textarea>${c.t?`<a class="b" href="tel:${esc(c.t)}">電話する</a>`:''}${c.m?`<a class="b" href="mailto:${esc(c.m)}">メール</a>`:''}<button data-act="delc" data-c="${c.id}" style="background:var(--pk)">消す</button></div>`).join('')+`<button data-act="addc">連絡先を追加</button>`}
-function st(){const l=new Date(S.last);return `<h1>設定・バックアップ</h1>
+function st(){const l=new Date(S.last);return `<h1>設定・バックアップ</h1><div class="c"><b>会社の条件</b><div class="sm">選ぶと、年間の手続きの表示が変わります。「不明」のときは、念のため全部表示します。税理士さんに聞いて選んでください。</div>${PF.map(([k,l,o])=>`<div class="row" style="padding:4px 0"><span>${l}</span><select data-pf="${k}">${o.split('|').map(v=>`<option ${((S.prof||{})[k]||(k=='exe'?'あり':'不明'))==v?'selected':''}>${v}</option>`).join('')}</select></div>`).join('')}</div>
 <div class="c y"><b>データは、この端末の中だけに保存されます</b><div class="sm w">ホーム画面のアイコンを削除すると、データも消えます。<br>消えにくくする設定：${P===true?'許可されています':'まだ許可されていません（ホーム画面に追加すると消えにくくなります）'}<br>無料の方法では、データが消えない保証まではできません。こまめにバックアップしてください。</div></div>
 <div class="c"><b>バックアップ</b><div class="sm">最後の保存：${l.getMonth()+1}/${l.getDate()}</div><button data-act="sh">ファイルに保存（共有）</button><button data-act="bk">JSONで書き出す</button><button data-act="rs">復元する</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
 <div class="c"><b>初期化・復元前の自動バックアップ</b><div class="sm">復元や初期化の前に、今のデータを自動で保存します。</div><button data-act="undo">直前の状態に戻す</button><button data-act="reset" style="background:var(--pk)">初期化する</button></div>
@@ -101,7 +106,7 @@ async function restore(f){if(!f)return;try{const o=JSON.parse(await f.text());if
 async function cpy(sh){const t=agText();if(sh&&navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);alert('コピーしました')}catch(e){prompt('コピーしてください',t)}}}
 const upd=t=>{const d=t.dataset;if(d.id){(S.over[d.id]=S.over[d.id]||{})[d.f]=t.type=='checkbox'?t.checked:t.value}else if(d.c){const c=S.contacts.find(x=>x.id==d.c);if(c)c[d.f]=t.value}else if(d.nt){S.notes[d.nt]=t.value}else return 0;return 1};
 document.addEventListener('input',e=>{if(upd(e.target))save(0)});
-document.addEventListener('change',e=>{const t=e.target,d=t.dataset;if(t.id=='fi'){restore(t.files[0]);return}if(d.ck){S.checks[d.ck]=t.checked;save(1);if(d.ck[0]=='c')render();return}if(d.fy){S.fy=+t.value;save(1);render();return}if(d.am){AM=+t.value;render();return}if(upd(t)){save(1);render()}});
+document.addEventListener('change',e=>{const t=e.target,d=t.dataset;if(t.id=='fi'){restore(t.files[0]);return}if(d.ck){S.checks[d.ck]=t.checked;save(1);if(d.ck[0]=='c')render();return}if(d.pf){S.prof=S.prof||{};S.prof[d.pf]=t.value;save(1);render();return}if(d.fy){S.fy=+t.value;save(1);render();return}if(d.am){AM=+t.value;render();return}if(upd(t)){save(1);render()}});
 document.addEventListener('toggle',e=>{const k=e.target.dataset&&e.target.dataset.k;if(k)e.target.open?OP.add(k):OP.delete(k)},true);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act],[data-tab]');if(!b)return;const d=b.dataset,a=d.act;
 if(d.tab){TAB=d.tab;render();scrollTo(0,0);return}
