@@ -20,7 +20,7 @@ nav button{flex:1;background:none;border-radius:0;font-size:12px;min-height:56px
 </style></head><body><div id="app"></div>
 <nav><button data-tab="home">ホーム</button><button data-tab="year">年間</button><button data-tab="ag">税理士</button><button data-tab="cont">連絡先</button><button data-tab="set">設定</button></nav>
 <script>
-const VER='1.3.0';
+const VER='1.4.0';
 const PF=[['tax','消費税','課税|免税|不明'],['gen','源泉所得税の納付','特例を使う|毎月納付|不明'],['mid','中間申告','対象|対象外|不明'],['sha','社会保険','あり|なし|不明'],['jyu','住民税の特別徴収','あり|なし|不明'],['exe','役員報酬','あり|なし']];
 const H={2026:'1/1,1/12,2/11,2/23,3/20,4/29,5/3,5/4,5/5,5/6,7/20,8/11,9/21,9/22,9/23,10/12,11/3,11/23',2027:'1/1,1/11,2/11,2/23,3/21,3/22,4/29,5/3,5/4,5/5,7/19,8/11,9/20,9/23,10/11,11/3,11/23',2028:'1/1,1/10,2/11,2/23,3/20,4/29,5/3,5/4,5/5,7/17,8/11,9/18,9/22,10/9,11/3,11/23'};
 const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),WD='日月火水木金土';
@@ -33,13 +33,13 @@ const T0=()=>{const x=new Date();return new Date(x.getFullYear(),x.getMonth(),x.
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const db=new Promise((ok,ng)=>{const r=indexedDB.open('mk',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ng(r.error)});
 const kv=async(w,k,v)=>{const d=await db;return new Promise((ok,ng)=>{const s=d.transaction('kv',w?'readwrite':'readonly').objectStore('kv');const q=w?s.put(v,k):s.get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ng(q.error)})};
-const fresh=()=>({v:1,fy:9,prof:{},over:{},contacts:[],checks:{},notes:{},last:Date.now(),chg:0,snooze:0});
-let S,P=null,VY=0,HY=0,LK=false,HT=0,TAB='home',AM=new Date().getMonth()+1,Y=0;const OP=new Set();
+const fresh=()=>({v:1,fy:9,prof:{},hide:{i:{},s:{}},cust:[],over:{},contacts:[],checks:{},notes:{},last:Date.now(),chg:0,snooze:0});
+let S,P=null,VY=0,HY=0,LK=false,HT=0,NEWV='',TAB='home',AM=new Date().getMonth()+1,Y=0;const OP=new Set();
 const save=c=>{if(c)S.chg++;kv(1,'s',S)};
 const SM=()=>S.fy%12+1;
 function build(){const pf=S.prof||{},sm=SM(),n=new Date(),y=VY||(n.getMonth()+1>=sm?n.getFullYear():n.getFullYear()-1),s=new Date(y,sm-1,1),L=[];Y=y;
 const nm=(m,d)=>{const x=new Date(y,m-1,d);return x<s?new Date(y+1,m-1,d):x};
-const T=(id,d,title,why,o)=>L.push({id:id+'_'+y,d:ymd(d),title,why,...o});
+const T=(id,d,title,why,o)=>L.push({id:id+'_'+y,b:o&&o.rec?id.replace(/\d+$/,''):id,d:ymd(d),title,why,...o});
 if(pf.exe!='なし')T('exec',dd(add(s,3),-1),'役員報酬の金額変更期限','会社の新しい1年が始まって3か月以内に、1年分のお給料をぴったり決めるルールです。<br>遅れると、増やした分が経費にならず税金が増えて損をします。<br>期の途中で増やすのは原則できないので、利益の見込みから先に考えます。',{lead:60});
 if(pf.exe!='なし')T('bonus',shift(dd(add(s,4),-1),'n'),'役員ボーナスの届出（いちばん遅い期限）','社長にボーナスを払うなら、「何月にいくら」を先に税務署へ届けるルールです。<br>期限は、株主総会で決めた日から1か月と、期首から4か月のうち早いほうです。<br>届けずに払うと経費にできず損をします。',{lead:60});
 T('tax',shift(dd(add(s,2),-1),'n'),'法人税・'+(pf.tax=='免税'?'':'消費税・')+'市民税の申告と納付','決算から2か月以内に、1年分の税金を計算して届け出て、払います。<br>遅れると延滞税など余分なお金がかかります。<br>税理士さんに早めに数字を確認しましょう。',{lead:45});
@@ -59,27 +59,32 @@ if(pf.sha!='なし')T('sh'+i,shift(new Date(a,b+2,0),'n'),'社会保険料の納
 if(pf.gen=='毎月納付')T('gs'+i,shift(new Date(a,b,10),'n'),'源泉所得税の納付（前月分）','社員や役員のお給料から預かった税金を、国へ納める日です。<br>毎月払う場合は、翌月10日までです。',{lead:7,rec:1});
 if(pf.jyu!='なし')T('jy'+i,shift(new Date(a,b,10),'n'),'住民税（特別徴収）の納付','お給料から預かった住民税を、市へ納める日です。<br>毎月10日までが基本です。特例の場合は年2回なので、税理士さんや市に確認します。',{lead:7,rec:1});
 T('bk'+i,new Date(a,b+1,0),'売上・経費の記帳、領収書の整理、預金残高の確認','毎月末に、お金の出入りを帳簿に書き、領収書をまとめます。<br>決算のときに慌てず、税理士さんへ渡す資料もそろいます。',{lead:3,rec:1})}
+(S.cust||[]).forEach(c=>{if(!c.d)return;const q=pd(c.d),e=add(s,12);let ds=[];
+if(c.rep=='毎年'){const x=new Date(y,q.getMonth(),q.getDate());ds=[x<s?new Date(y+1,q.getMonth(),q.getDate()):x]}
+else if(c.rep=='毎月'){for(let i=0;i<12;i++){const m=add(s,i),a=m.getFullYear(),b=m.getMonth();ds.push(new Date(a,b,Math.min(q.getDate(),new Date(a,b+1,0).getDate())))}}
+else if(q>=s&&q<e)ds=[q];
+ds.forEach((x,i)=>L.push({id:'u'+c.id+'_'+i+'_'+y,b:'u'+c.id,d:ymd(x),title:esc(c.t),why:esc(c.m||'自分で足した予定です。'),lead:+c.l||30,cu:c.id,note:1,rec:c.rep=='毎月'?1:0}))});
 return L}
 const SS=['未着手','準備中','税理士確認待ち','提出・納付待ち','完了','対象外'],MG={'未対応':'未着手','税理士へ相談中':'税理士確認待ち'},WHO=['','妻（社長）','夫（役員）','税理士','社労士','その他'];
 const isOpen=t=>t.st!='完了'&&t.st!='対象外';
 const CK={exec:['利益の見込みを確認','税理士さんと金額を相談','新しい金額を決める','決めた内容を書類に残す'],bonus:['株主総会の日を決める','金額と支給日を決める','税理士さんに届出書を作ってもらう','税務署へ届出を出す'],tax:['税理士さんへ資料を出す','決算書の確認','申告内容の確認','申告完了','納付額の確認','納付完了'],kyo:['書類を取り寄せる','希望の月と金額を決める','書類を出す（5日必着）']};
-const tasks=()=>build().map(t=>{const o=S.over[t.id]||{};return{...t,d:o.d||t.d,st:MG[o.st]||o.st||'未着手',memo:o.memo||'',mod:!!o.d,who:o.who||'',sd:o.sd||'',pd:o.pd||'',ok:!!o.ok,ck:CK[t.id.split('_')[0]]||[]}}).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+const tasks=()=>build().map(t=>{const o=S.over[t.id]||{};return{...t,d:o.d||t.d,st:MG[o.st]||o.st||'未着手',memo:o.memo||'',mod:!!o.d,who:o.who||'',sd:o.sd||'',pd:o.pd||'',ok:!!o.ok,ck:CK[t.id.split('_')[0]]||[]}}).filter(t=>!(((S.hide||{}).i||{})[t.id]||((S.hide||{}).s||{})[t.b])).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
 const op=k=>OP.has(k)?'open':'';
 const card=t=>{const n=nd(t.d),dt=pd(t.d),done=!isOpen(t),cl=done?'g':n<=7?'r':n<=30?'y':'',k=t.id;
 const lb=done?t.st:n<0?`期限を${-n}日すぎています`:n==0?'今日':`あと${n}日`;
-return `<div class="c ${cl}"><div class="row sm w"><b>${dt.getMonth()+1}/${dt.getDate()}（${WD[dt.getDay()]}）　${lb}</b><span class="ch">${t.st}</span></div><div class="sm">${t.rec?'':t.ok?'✓ 税理士さんに確認済み':'要確認（日付は目安です）'}${t.who?'　担当：'+t.who:''}${t.sd?'　提出済 '+t.sd.slice(5).replace('-','/'):''}${t.pd?'　納付済 '+t.pd.slice(5).replace('-','/'):''}</div>
+return `<div class="c ${cl}"><div class="row sm w"><b>${dt.getMonth()+1}/${dt.getDate()}（${WD[dt.getDay()]}）　${lb}</b><span class="ch">${t.st}</span></div><div class="sm">${t.rec||t.note?'':t.ok?'✓ 税理士さんに確認済み':'要確認（日付は目安です）'}${t.who?'　担当：'+t.who:''}${t.sd?'　提出済 '+t.sd.slice(5).replace('-','/'):''}${t.pd?'　納付済 '+t.pd.slice(5).replace('-','/'):''}</div>
 <div style="font-weight:600;margin:4px 0">${t.title}${t.mod?' <span class="sm">（手入力）</span>':''}</div>
 <details data-k="w${k}" ${op('w'+k)}><summary>これ何？</summary><div class="sm w">${t.why}</div></details>${t.ck.length?`<details data-k="c${k}" ${op('c'+k)}><summary>チェックリスト（${t.ck.filter((_,i)=>S.checks['c'+k+'_'+i]).length}/${t.ck.length}）</summary>${t.ck.map((s,i)=>`<label class="row w" style="justify-content:flex-start;padding:3px 0"><input type="checkbox" data-ck="c${k}_${i}" ${S.checks['c'+k+'_'+i]?'checked':''}><span>${s}</span></label>`).join('')}</details>`:''}
 <details data-k="e${k}" ${op('e'+k)}><summary>日付・状態・メモを変える</summary>
 <input type="date" value="${t.d}" data-id="${k}" data-f="d"><select data-id="${k}" data-f="st">${SS.map(s=>`<option ${s==t.st?'selected':''}>${s}</option>`).join('')}</select>
-<select data-id="${k}" data-f="who">${WHO.map(s=>`<option ${s==t.who?'selected':''}>${s}</option>`).join('')}</select> <span class="sm">担当者</span>${t.rec?'':`<div class="sm">提出完了日</div><input type="date" value="${t.sd}" data-id="${k}" data-f="sd"><div class="sm">納付完了日</div><input type="date" value="${t.pd}" data-id="${k}" data-f="pd"><label class="row w" style="justify-content:flex-start"><input type="checkbox" ${t.ok?'checked':''} data-id="${k}" data-f="ok"><span>税理士さんに確認した</span></label>`}<textarea rows="2" placeholder="メモ" data-id="${k}" data-f="memo">${esc(t.memo)}</textarea>${S.over[k]?`<button data-act="rst" data-id="${k}">自動の内容に戻す</button>`:''}</details></div>`};
+<select data-id="${k}" data-f="who">${WHO.map(s=>`<option ${s==t.who?'selected':''}>${s}</option>`).join('')}</select> <span class="sm">担当者</span>${t.rec?'':`<div class="sm">提出完了日</div><input type="date" value="${t.sd}" data-id="${k}" data-f="sd"><div class="sm">納付完了日</div><input type="date" value="${t.pd}" data-id="${k}" data-f="pd"><label class="row w" style="justify-content:flex-start"><input type="checkbox" ${t.ok?'checked':''} data-id="${k}" data-f="ok"><span>税理士さんに確認した</span></label>`}<textarea rows="2" placeholder="メモ" data-id="${k}" data-f="memo">${esc(t.memo)}</textarea>${t.cu?`<button data-act="delcu" data-c="${t.cu}">この予定を消す</button>`:t.rec?`<button data-act="hide" data-id="${k}" data-b="${t.b}" data-n="${esc(t.title)}">この月だけ消す</button><button data-act="hide" data-id="${k}" data-b="${t.b}" data-n="${esc(t.title)}" data-s="1">毎月すべて消す</button>`:`<button data-act="hide" data-id="${k}" data-b="${t.b}" data-n="${esc(t.title)}" data-s="1">この予定を消す（来年以降も出しません）</button>`}<button data-act="ics" data-id="${k}">カレンダーに入れる（通知）</button>${S.over[k]?`<button data-act="rst" data-id="${k}">自動の内容に戻す</button>`:''}</details></div>`};
 const nag=()=>(Date.now()-S.last>7*864e5||S.chg>=15)&&Date.now()>S.snooze?`<div class="c y"><b>バックアップしておく？</b><div class="sm w">データが増えました。念のため、保存しておくと安心です。</div><button data-act="sh">保存する</button><button data-act="snz" style="background:#fff">あとで</button></div>`:'';
 function home(){const L=tasks(),n=new Date(),u=L.filter(t=>isOpen(t)&&nd(t.d)<=(t.lead||35)),nx=L.filter(t=>isOpen(t)&&!t.rec&&nd(t.d)>(t.lead||35)).slice(0,4);
-return `<div class="row"><h1>まもる経営カレンダー</h1></div><div class="sm">${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日（${WD[n.getDay()]}）　決算月 <select data-fy="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${S.fy==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div>`+nag()+(Object.keys(S.prof||{}).length?'':`<div class="c y"><b>会社の条件を設定しましょう</b><div class="sm w">課税・免税や源泉の特例などを選ぶと、不要な手続きが消えます。</div><button data-tab="set">設定へ</button></div>`)+
+return `<div class="row"><h1>まもる経営カレンダー</h1></div><div class="sm">${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日（${WD[n.getDay()]}）　決算月 <select data-fy="1">${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${S.fy==i+1?'selected':''}>${i+1}月</option>`).join('')}</select></div>`+(NEWV?`<div class="c y"><b>新しい版があります（${NEWV}）</b><br><button data-act="latest">最新版にする</button></div>`:'')+nag()+(Object.keys(S.prof||{}).length?'':`<div class="c y"><b>会社の条件を設定しましょう</b><div class="sm w">課税・免税や源泉の特例などを選ぶと、不要な手続きが消えます。</div><button data-tab="set">設定へ</button></div>`)+
 `<h2>今、対応したいこと（${u.length}件）</h2>`+(u.map(card).join('')||'<div class="c g">今は急ぎの手続きはありません。</div>')+
-`<h2>このあとの予定</h2><div class="c">${nx.map(t=>`<div class="row sm w" style="padding:3px 0"><span>${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}　${t.title}</span><span>あと${nd(t.d)}日</span></div>`).join('')}</div><div class="sm">金額や期限は、税理士さんに最終確認してください。</div>`}
+`<h2>このあとの予定</h2><div class="c">${nx.map(t=>`<div class="row sm w" style="padding:3px 0"><span>${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}　${t.title}</span><span>あと${nd(t.d)}日</span></div>`).join('')}</div><div class="sm">金額や期限は、税理士さんに最終確認してください。</div><button data-act="latest" style="font-size:13px">最新版にする</button>`}
 function year(){VY=0;build();const cur=Y,ys=[...new Set([cur+1,cur,...Object.keys(S.over).map(k=>+k.split('_').pop()).filter(x=>x>2000)])].sort().reverse();VY=HY;const g={};tasks().forEach(t=>(g[t.d.slice(0,7)]=g[t.d.slice(0,7)]||[]).push(t));VY=0;
-return `<div class="row"><h1>年間一覧</h1><select data-hy="1">${ys.map(y=>`<option value="${y}" ${(HY||cur)==y?'selected':''}>${y}年度${y==cur?'（今期）':y>cur?'（来期）':'（過去）'}</option>`).join('')}</select></div><button data-act="carry" style="font-size:13px">前の年度の担当者を引き継ぐ</button><div class="sm">${Y}年${SM()}月〜（決算月 ${S.fy}月）</div>`+Object.keys(g).sort().map(k=>`<h2>${+k.slice(5)}月</h2>`+g[k].filter(t=>!t.rec).map(card).join('')+`<details data-k="r${k}" ${op('r'+k)}><summary>この月の振込日・引落し日</summary>${g[k].filter(t=>t.rec).map(card).join('')}</details>`).join('')}
+return `<div class="row"><h1>年間一覧</h1><select data-hy="1">${ys.map(y=>`<option value="${y}" ${(HY||cur)==y?'selected':''}>${y}年度${y==cur?'（今期）':y>cur?'（来期）':'（過去）'}</option>`).join('')}</select></div><button data-act="carry" style="font-size:13px">前の年度の担当者を引き継ぐ</button><details class="c" data-k="addcu" ${op('addcu')}><summary>＋ 自分の予定を足す</summary><input id="cu_t" type="text" placeholder="予定の名前"><input id="cu_d" type="date"><select id="cu_r"><option>なし</option><option>毎年</option><option>毎月</option></select> <span class="sm">くり返し</span><input id="cu_l" type="text" inputmode="numeric" placeholder="何日前から知らせる（例：30）"><textarea id="cu_m" rows="2" placeholder="メモ"></textarea><button data-act="addcu">追加する</button>${(S.cust||[]).map(c=>`<div class="row sm w" style="padding:3px 0"><span>${esc(c.t)}　${c.d}　${c.rep}</span><button data-act="delcu" data-c="${c.id}">消す</button></div>`).join('')}</details><div class="sm">${Y}年${SM()}月〜（決算月 ${S.fy}月）</div>`+Object.keys(g).sort().map(k=>`<h2>${+k.slice(5)}月</h2>`+g[k].filter(t=>!t.rec).map(card).join('')+`<details data-k="r${k}" ${op('r'+k)}><summary>この月の振込日・引落し日</summary>${g[k].filter(t=>t.rec).map(card).join('')}</details>`).join('')}
 const th=m=>{const i=(m-SM()+12)%12,r=[];if(i<3)r.push('来期の役員報酬の額を、利益の見込みから決める','役員ボーナスを出すか決め、株主総会の日を押さえる');if(i<2)r.push('社会保険料控除証明書・領収済通知書を渡す');if(i==5||i==6)r.push('利益の見込みを確認する（役員報酬は期の途中で増やせないため、他の調整を相談）');if(i>=9)r.push('決算前の調整（決算賞与・倒産防止共済・前払費用・修繕や設備・不要資産の処分）');return r};
 function agi(){const nx=AM%12+1,L=tasks().filter(t=>!t.rec&&isOpen(t)&&[AM,nx].includes(pd(t.d).getMonth()+1));
 return [...L.map(t=>({k:'t'+t.id,s:`${t.title}（${pd(t.d).getMonth()+1}/${pd(t.d).getDate()}）`})),...th(AM).map((s,i)=>({k:'h'+Y+'_'+AM+i,s})),...(S.notes['x'+AM]||'').split('\n').filter(Boolean).map((s,i)=>({k:'u'+Y+'_'+AM+i,s}))]}
@@ -95,8 +100,8 @@ function st(){const l=new Date(S.last);return `<h1>設定・バックアップ</
 <div class="c y"><b>データは、この端末の中だけに保存されます</b><div class="sm w">ホーム画面のアイコンを削除すると、データも消えます。<br>消えにくくする設定：${P===true?'許可されています':'まだ許可されていません（ホーム画面に追加すると消えにくくなります）'}<br>無料の方法では、データが消えない保証まではできません。こまめにバックアップしてください。</div></div>
 <div class="c"><b>バックアップ</b><div class="sm">最後の保存：${l.getMonth()+1}/${l.getDate()}</div><button data-act="bke">暗号化して保存（おすすめ）</button><button data-act="sh">ファイルに保存（共有）</button><button data-act="bk">JSONで書き出す</button><button data-act="rs">復元する</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
 <div class="c"><b>画面ロック（かんたんな鍵）</b><div class="sm">${S.lock?'設定中':'未設定'}。ひらくとき、暗証番号が必要になります。これは目隠しで、データそのものを暗号化するものではありません。本当の守りは、iPhone自体のパスコードです。</div><button data-act="setlock">${S.lock?'番号を変える':'設定する'}</button>${S.lock?'<button data-act="nolock" style="background:var(--pk)">解除する</button>':''}</div><div class="c"><b>初期化・復元前の自動バックアップ</b><div class="sm">復元や初期化の前に、今のデータを自動で保存します。</div><button data-act="undo">直前の状態に戻す</button><button data-act="reset" style="background:var(--pk)">初期化する</button></div>
-<div class="sm">祝日データは2028年末まで入っています。決算月はホーム画面で変えられます。</div>`}
-function render(){$('nav').style.display=LK?'none':'flex';if(LK){$('#app').innerHTML=LOCK;return}$('#app').innerHTML=({home,year,ag,cont,set:st})[TAB]()+`<div class="ft">Presented by 波動調整師 千鈴龍穂<br>バージョン ${VER}</div>`;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab==TAB))}
+<div class="c"><b>消した予定</b>${hl()}</div><div class="c"><b>アプリの更新</b><div class="sm">バージョン ${VER}。古い画面が残っているときに押してください。入力したデータは消えません。</div><button data-act="latest">最新版にする</button></div><div class="sm">祝日データは2028年末まで入っています。決算月はホーム画面で変えられます。</div>`}
+function render(){$('nav').style.display=LK?'none':'flex';if(LK){$('#app').innerHTML=LOCK;return}$('#app').innerHTML=({home,year,ag,cont,set:st})[TAB]()+`<div class="ft">Presented by 株式会社SAKURA WORKS<br>バージョン ${VER}</div>`;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab==TAB))}
 async function bk(sh,ec){let txt=JSON.stringify(S);if(ec){const p=prompt('バックアップ用のパスワードを決めてください（忘れると開けません）');if(!p)return;txt=await enc(txt,p)}const n='mamoru-backup-'+ymd(new Date())+(ec?'-enc':'')+'.json',f=new File([txt],n,{type:'application/json'});
 if(sh&&navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){return}}else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=n;a.click()}
 S.last=Date.now();S.chg=0;save(0);render()}
@@ -111,6 +116,21 @@ async function setlock(){const a=prompt('暗証番号を入れてください（
 function nolock(){if(confirm('画面ロックを解除しますか？')){S.lock='';save(1);render()}}
 function forgot(){if(confirm('暗証番号を忘れたときは、アプリの中のデータを消して最初からになります。バックアップがあれば、あとで復元できます。消しますか？')){S=fresh();LK=false;save(0);render()}}
 function carry(){VY=0;build();const y=HY||Y;let n=0;Object.keys(S.over).forEach(k=>{if(k.endsWith('_'+(y-1))){const o=S.over[k],nk=k.slice(0,-5)+'_'+y;if(o.who&&!(S.over[nk]&&S.over[nk].who)){(S.over[nk]=S.over[nk]||{}).who=o.who;n++}}});save(1);alert(n+'件の担当者を引き継ぎました');render()}
+const hl=()=>{const h=S.hide||{},a=[...Object.entries(h.s||{}).map(([k,n])=>['s',k,n+'（毎回）']),...Object.entries(h.i||{}).map(([k,n])=>['i',k,n+'（この月だけ）'])];return a.length?a.map(([t,k,n])=>`<div class="row" style="padding:4px 0"><span class="sm w">${esc(n)}</span><button data-act="unhide" data-t="${t}" data-h="${esc(k)}">戻す</button></div>`).join(''):'<div class="sm">消した予定はありません。</div>'};
+function hide(d){if(!confirm(d.s?'「'+d.n+'」を、これから出さないようにします。設定画面からいつでも戻せます。':'この月の「'+d.n+'」だけ消します。'))return;S.hide=S.hide||{};S.hide.i=S.hide.i||{};S.hide.s=S.hide.s||{};if(d.s)S.hide.s[d.b]=d.n;else S.hide.i[d.id]=d.n;save(1);render()}
+function unhide(d){const h=S.hide||{};delete (d.t=='s'?h.s:h.i)[d.h];save(1);render()}
+function delcu(id){if(confirm('この予定を消しますか？（毎年・毎月の分もすべて消えます）')){S.cust=(S.cust||[]).filter(c=>c.id!=id);save(1);render()}}
+function addcu(){const t=$('#cu_t').value.trim(),d=$('#cu_d').value;if(!t||!d){alert('名前と日付を入れてください');return}(S.cust=S.cust||[]).push({id:Date.now(),t,d,rep:$('#cu_r').value,l:$('#cu_l').value,m:$('#cu_m').value});save(1);render()}
+async function ics(id){const yy=+id.split('_').pop();VY=yy;const t=tasks().find(x=>x.id==id);VY=0;build();if(!t)return;
+const rp=t.cu?((S.cust||[]).find(c=>c.id==t.cu)||{}).rep:'';let fr=rp=='毎年'?'YEARLY':rp=='毎月'?'MONTHLY':'';
+if(!fr&&confirm(t.rec?'毎月くり返しますか？\nOK＝毎月　キャンセル＝今回だけ':'毎年くり返しますか？\nOK＝毎年　キャンセル＝今回だけ'))fr=t.rec?'MONTHLY':'YEARLY';
+const dt=pd(t.d),f2=x=>x.getFullYear()+pad(x.getMonth()+1)+pad(x.getDate()),ti=t.title.replace(/<[^>]*>|&\w+;/g,'').replace(/[\\;,]/g,m=>'\\'+m);
+const al=[...new Set([+t.lead||30,7,0])].sort((a,b)=>b-a).map(n=>`BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:${ti}\r\nTRIGGER:${n?'-P'+(n-1)+'DT15H':'-PT15H'}\r\nEND:VALARM`).join('\r\n');
+const txt=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//mamoru//JP','BEGIN:VEVENT','UID:'+id+'@mamoru','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART;VALUE=DATE:'+f2(dt),'DTEND;VALUE=DATE:'+f2(dd(dt,1)),'SUMMARY:'+ti,...(fr?['RRULE:FREQ='+fr]:[]),al,'END:VEVENT','END:VCALENDAR'].join('\r\n');
+const fl=new File([txt],'mamoru-event.ics',{type:'text/calendar'});
+if(navigator.canShare&&navigator.canShare({files:[fl]})){try{await navigator.share({files:[fl]});return}catch(e){return}}
+const a=document.createElement('a');a.href=URL.createObjectURL(fl);a.download='mamoru-event.ics';a.click()}
+async function latest(){if(!confirm('古い保存分を捨てて、最新版を読み込みます。入力したデータは消えません。よろしいですか？'))return;try{const r=await navigator.serviceWorker.getRegistrations();await Promise.all(r.map(x=>x.unregister()));const k=await caches.keys();await Promise.all(k.map(x=>caches.delete(x)))}catch(e){}location.replace(location.pathname+'?r='+Date.now())}
 async function swap(n,msg){if(!confirm(msg))return;await kv(1,'prev',JSON.stringify(S));S={...fresh(),...n};S.chg=0;S.last=Date.now();save(0);render()}
 async function undo(){const p=await kv(0,'prev');p?swap(JSON.parse(p),'直前の状態に戻します。今のデータは自動で保存されます。よろしいですか？'):alert('戻せるデータがありません')}
 async function restore(f){if(!f)return;try{let o=JSON.parse(await f.text());if(o&&o.enc){const p=prompt('バックアップのパスワードを入れてください');if(!p)return;o=JSON.parse(await dec(o,p))}if(!(o&&o.v==1&&o.over&&o.contacts))throw 0;swap(o,'今のデータを自動で保存してから、このファイルの内容に入れ替えます。よろしいですか？')}catch(e){alert('このファイルは読み込めませんでした（パスワードが違う可能性があります）')}}
@@ -123,9 +143,10 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act],[data
 if(d.tab){TAB=d.tab;render();scrollTo(0,0);return}
 if(a=='rst'){delete S.over[d.id];save(1);render()}else if(a=='addc'){S.contacts.push({id:Date.now()});save(1);render()}
 else if(a=='delc'){if(confirm('この連絡先を消しますか？')){S.contacts=S.contacts.filter(x=>x.id!=d.c);save(1);render()}}
-else if(a=='bk')bk(0);else if(a=='sh')bk(1);else if(a=='bke')bk(1,1);else if(a=='unl')unl();else if(a=='setlock')setlock();else if(a=='nolock')nolock();else if(a=='forgot')forgot();else if(a=='carry')carry();else if(a=='snz'){S.snooze=Date.now()+3*864e5;save(0);render()}
+else if(a=='bk')bk(0);else if(a=='sh')bk(1);else if(a=='bke')bk(1,1);else if(a=='unl')unl();else if(a=='setlock')setlock();else if(a=='nolock')nolock();else if(a=='forgot')forgot();else if(a=='carry')carry();else if(a=='hide')hide(d);else if(a=='unhide')unhide(d);else if(a=='delcu')delcu(d.c);else if(a=='addcu')addcu();else if(a=='ics')ics(d.id);else if(a=='latest')latest();else if(a=='snz'){S.snooze=Date.now()+3*864e5;save(0);render()}
 else if(a=='cp')cpy(0);else if(a=='send')cpy(1);else if(a=='rs')$('#fi').click();
 else if(a=='reset')swap(fresh(),'全部のデータを消して最初の状態にします。今のデータは自動で保存してから実行します。よろしいですか？');else if(a=='undo')undo()});
-(async()=>{try{S=await kv(0,'s')}catch(e){}S=S?{...fresh(),...S}:fresh();LK=!!S.lock;try{P=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null}catch(e){}render();
-if('serviceWorker' in navigator){const had=navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()})}})();
+(async()=>{try{S=await kv(0,'s')}catch(e){}S=S?{...fresh(),...S}:fresh();LK=!!S.lock;if(location.search)history.replaceState(null,'',location.pathname);try{P=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null}catch(e){}render();
+if('serviceWorker' in navigator){const had=navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()})}
+fetch('index.html?c='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{const m=t.match(/const VER='([\d.]+)'/);if(m&&m[1]!=VER){NEWV=m[1];render()}}).catch(()=>{})})();
 </script></body></html>
